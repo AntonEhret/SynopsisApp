@@ -1,0 +1,196 @@
+---
+title: "Synopsis from IMDB"
+author: "Anton"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  fig.align = "center",
+  error = FALSE,
+  message = FALSE, 
+  warning = FALSE,
+  tidy = TRUE
+)
+```
+
+# Loading Libraries
+```{r}
+library(readxl) #for reading excel file
+library(rvest) #for scraping
+library(dplyr) #for piping
+library(RCurl) #for checking 404 of page
+library(robotstxt) #for checking robotstxt
+library(data.table) #for encanced data.frame
+library(stringr) #for replacing matched patterns
+library(stringi) #for ADCII transformation
+library(tidytext) #for unnesting tokens
+library(tidyverse)
+```
+
+# Scraping
+## Checking permissions co scrape and crawl
+
+```{r}
+#' _Check for permissions_
+# rtxt <- robotstxt("https://www.imdb.com")
+# rtxt$permissions
+# 
+# paths_allowed("https://www.imdb.com/list/ls009487211/")
+```
+
+## Getting links and URLs for movies
+```{r}
+#' *URLS we want to scrape from*
+#' On IMDB there is a page where (almost) all the best picture nominees are listed
+#' The list is however paginated so we need multiple url
+  url1 <- "https://www.imdb.com/list/ls009487211/"
+  url2 <- "https://www.imdb.com/list/ls009487211/?sort=list_order,asc&st_dt=&mode=detail&page=2"
+  url3 <- "https://www.imdb.com/list/ls009487211/?sort=list_order,asc&st_dt=&mode=detail&page=3"
+  url4 <- "https://www.imdb.com/list/ls009487211/?sort=list_order,asc&st_dt=&mode=detail&page=4"
+  url5 <- "https://www.imdb.com/list/ls009487211/?sort=list_order,asc&st_dt=&mode=detail&page=5"
+  
+#' *Getting links for movies*
+#' The Css path is ".lister-item-header a"
+links_movies <- c()
+  links_movies[1:100] <- read_html(url1) %>%
+    html_nodes(".lister-item-header a") %>%
+    html_attr("href")
+  
+  links_movies[101:200] <- read_html(url2) %>%
+    html_nodes(".lister-item-header a") %>%
+    html_attr("href")
+  
+  links_movies[201:300] <- read_html(url3) %>%
+    html_nodes(".lister-item-header a") %>%
+    html_attr("href")
+  
+  links_movies[301:400] <- read_html(url4) %>%
+    html_nodes(".lister-item-header a") %>%
+    html_attr("href")
+  
+  links_movies[401:472] <- read_html(url5) %>%
+    html_nodes(".lister-item-header a") %>%
+    html_attr("href")
+
+#' *Creating data table*
+movies <- data.table(movielink = links_movies)
+  # head(movies)
+  
+#' *Making complete url for movie*
+movies$url_movie <- NA
+  movies$url_movie <- paste0("https://www.imdb.com", movies$movielink)
+  
+#' *Removing ?ref_* 
+#' Finding location of ref in string
+#' We cannot look for "?" since it is a regex, so we look for "ref"
+location_ref <- c()
+  for (i in 1:length(movies$url_movie)){
+    print(paste0("Loop nr.", i))
+    location_ref[i] <- str_locate_all(pattern ='ref', movies$url_movie[i])
+  }
+#' *Removing everything after characterposition-2 to remove "/?" as well*
+  for (i in 1:length(movies$url_movie)){
+    print(paste0("Loop nr.", i))
+    movies$url_movie[i] <- substr(movies$url_movie[i],1,location_ref[[i]][1]-2)
+  }
+
+#' *Checking if URL exists for control*
+#' Doing this only once since it takes a long time
+# valid.url <- c()
+#   for (i in 1:length(movies$url_movie)){
+#   valid.url[i] <- url.exists(movies$url_movie[i])
+#   }
+# which(valid.url == FALSE)
+#' Output:
+#' > integer(0)
+```
+## Creating URLs for synopsis
+The setup of the link for the synopsis and the link is very similar.
++ Movie: /title/tt6751668/
++ Synopsis: /title/tt6751668/synopsis
+So we simply paste /synopsis to the end of the url_movie
+```{r}
+#' *Pasting url for Synopsis*
+movies$url_synopsis <- NA
+  movies$url_synopsis <- paste0(movies$url_movie, "plotsummary/")
+#' *Checking if URL exists for control*
+#' Doing this only once since it takes a long time
+# valid.url_syn <- c()
+#   for (i in 1:length(movies$url_synopsis)){
+#   valid.url_syn[i] <- url.exists(movies$url_synopsis[i])
+#   }
+# which(valid.url_syn == FALSE)
+#' Output:
+#' > integer(0)
+```
+
+## Getting Names and year
+```{r}
+#' *Getting Movie Titles*
+movies$title <- NA
+  for (i in 1:length(movies$url_synopsis)){
+  print(paste0("Loop nr.", i))
+  movies$title[i] <- read_html(movies$url_synopsis[i]) %>%
+    html_nodes(".parent a") %>%
+    html_text()
+  }
+
+#' *Getting Year*
+movies$year <- NA
+  for (i in 1:length(movies$url_synopsis)){
+  print(paste0("Loop nr.", i))
+  movies$year[i] <- read_html(movies$url_movie[i]) %>%
+    html_nodes("#titleYear a") %>%
+    html_text()
+  }
+```
+```{r}
+write.csv(movies,"/Data/movies.csv", row.names = FALSE)
+```
+
+## Getting Synopsis
+CSS: #plot-synopsis-content .ipl-zebra-list__item
+```{r}
+movies <- read.csv("/Data/movies.csv")
+movies$synopsis <- NA
+for ( i in 1:length(movies$url_synopsis)){
+  print(paste0("Loop nr.", i))
+  movies$synopsis[i] <- read_html(movies$url_synopsis[i]) %>%
+    html_nodes("#plot-synopsis-content .ipl-zebra-list__item") %>%
+    html_text()
+}
+movies$synopsis <- str_squish(movies$synopsis)
+
+movies$synopsis <- movies$synopsis %>% 
+  gsub(pattern = "It looks like we don't have a Synopsis for this title yet. Be the first to contribute! Just click the \"Edit page\" button at the bottom of the page or learn more in the Synopsis submission guide."
+       , replacement = "empty")
+```
+
+```{r}
+write.csv(movies,"Data/01. synopsis.csv", row.names = FALSE)
+```
+
+## Plot
+```{r}
+movies$Y_N <- NA
+
+for (i in 1:length(movies$Y_N)){
+  if (movies$synopsis[i] == "empty"){
+    movies$Y_N[i] <- "NO"
+  } else {
+    movies$Y_N[i] <- "Yes"
+  }
+}
+
+ggplot(plot_1, aes(fill=Y_N, y=Freq, x=year)) + 
+    geom_bar(position="stack", stat="identity") +
+    ggtitle(paste0("Total Nr of Synopsis available: ", length(movies$scripts))) +
+    xlab("") +
+    ylab("Synopsis") +
+    theme_bw(base_size = 16) + theme(plot.title = element_text(hjust = 0.5)) +
+    scale_x_continuous(breaks = seq(min(plot_1$year) + 3, max(plot_1$year) + 3, 5))
+```
+
