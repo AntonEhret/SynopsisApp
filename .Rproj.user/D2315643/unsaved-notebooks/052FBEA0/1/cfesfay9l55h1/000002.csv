@@ -1,5 +1,0 @@
-"0","#' _Check for permissions_"
-"0","# rtxt <- robotstxt(""https://www.imdb.com"")"
-"0","# rtxt$permissions"
-"0","# "
-"0","# paths_allowed(""https://www.imdb.com/list/ls009487211/"")"

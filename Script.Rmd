@@ -1,0 +1,481 @@
+---
+title: "Synopsis from IMDB"
+author: "Anton"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  fig.align = "center",
+  error = FALSE,
+  message = FALSE, 
+  warning = FALSE,
+  tidy = TRUE
+)
+```
+
+# Loading Libraries
+```{r}
+library(readxl) #for reading excel file
+library(rvest) #for scraping
+library(dplyr) #for piping
+library(RCurl) #for checking 404 of page
+library(robotstxt) #for checking robotstxt
+library(data.table) #for encanced data.frame
+library(stringr) #for replacing matched patterns
+library(stringi) #for ADCII transformation
+library(tidytext) #for unnesting tokens
+library(tidyverse)
+library(tokenizers) #for stemming and tokenizing
+library(tidyr)
+library(tm)
+library(topicmodels) #for LDA
+library(fmsb) #for Radarchart
+```
+
+# Scraping
+## Checking permissions co scrape and crawl
+
+```{r}
+#' _Check for permissions_
+# rtxt <- robotstxt("https://www.imdb.com")
+# rtxt$permissions
+# 
+# paths_allowed("https://www.imdb.com/list/ls009487211/")
+```
+
+## Getting links and URLs for movies
+```{r}
+#' *URLS we want to scrape from*
+#' On IMDB there is a page where (almost) all the best picture nominees are listed
+#' The list is however paginated so we need multiple url
+  url1 <- "https://www.imdb.com/list/ls009487211/"
+  url2 <- "https://www.imdb.com/list/ls009487211/?sort=list_order,asc&st_dt=&mode=detail&page=2"
+  url3 <- "https://www.imdb.com/list/ls009487211/?sort=list_order,asc&st_dt=&mode=detail&page=3"
+  url4 <- "https://www.imdb.com/list/ls009487211/?sort=list_order,asc&st_dt=&mode=detail&page=4"
+  url5 <- "https://www.imdb.com/list/ls009487211/?sort=list_order,asc&st_dt=&mode=detail&page=5"
+  
+#' *Getting links for movies*
+#' The Css path is ".lister-item-header a"
+links_movies <- c()
+  links_movies[1:100] <- read_html(url1) %>%
+    html_nodes(".lister-item-header a") %>%
+    html_attr("href")
+  
+  links_movies[101:200] <- read_html(url2) %>%
+    html_nodes(".lister-item-header a") %>%
+    html_attr("href")
+  
+  links_movies[201:300] <- read_html(url3) %>%
+    html_nodes(".lister-item-header a") %>%
+    html_attr("href")
+  
+  links_movies[301:400] <- read_html(url4) %>%
+    html_nodes(".lister-item-header a") %>%
+    html_attr("href")
+  
+  links_movies[401:472] <- read_html(url5) %>%
+    html_nodes(".lister-item-header a") %>%
+    html_attr("href")
+
+#' *Creating data table*
+movies <- data.table(movielink = links_movies)
+  # head(movies)
+  
+#' *Making complete url for movie*
+movies$url_movie <- NA
+  movies$url_movie <- paste0("https://www.imdb.com", movies$movielink)
+  
+#' *Removing ?ref_* 
+#' Finding location of ref in string
+#' We cannot look for "?" since it is a regex, so we look for "ref"
+location_ref <- c()
+  for (i in 1:length(movies$url_movie)){
+    cat(paste0("Loop nr.", i, ", "))
+    location_ref[i] <- str_locate_all(pattern ='ref', movies$url_movie[i])
+  }
+#' *Removing everything after characterposition-2 to remove "/?" as well*
+  for (i in 1:length(movies$url_movie)){
+    cat(paste0("Loop nr.", i, ", "))
+    movies$url_movie[i] <- substr(movies$url_movie[i],1,location_ref[[i]][1]-2)
+  }
+
+#' *Checking if URL exists for control*
+#' Doing this only once since it takes a long time
+# valid.url <- c()
+#   for (i in 1:length(movies$url_movie)){
+#   valid.url[i] <- url.exists(movies$url_movie[i])
+#   }
+# which(valid.url == FALSE)
+#' Output:
+#' > integer(0)
+```
+## Creating URLs for synopsis
+The setup of the link for the synopsis and the link is very similar.
++ Movie: /title/tt6751668/
++ Synopsis: /title/tt6751668/synopsis
+So we simply paste /synopsis to the end of the url_movie
+```{r}
+#' *Pasting url for Synopsis*
+movies$url_synopsis <- NA
+  movies$url_synopsis <- paste0(movies$url_movie, "plotsummary/")
+#' *Checking if URL exists for control*
+#' Doing this only once since it takes a long time
+# valid.url_syn <- c()
+#   for (i in 1:length(movies$url_synopsis)){
+#   valid.url_syn[i] <- url.exists(movies$url_synopsis[i])
+#   }
+# which(valid.url_syn == FALSE)
+#' Output:
+#' > integer(0)
+```
+
+## Getting Names and year
+```{r}
+#' *Getting Movie Titles*
+movies$title <- NA
+  for (i in 1:length(movies$url_synopsis)){
+  cat(paste0("Loop nr.", i, ", "))
+  movies$title[i] <- read_html(movies$url_synopsis[i]) %>%
+    html_nodes(".parent a") %>%
+    html_text()
+  }
+
+#' *Getting Year*
+movies$year <- NA
+  for (i in 1:length(movies$url_synopsis)){
+  cat(paste0("Loop nr.", i))
+  movies$year[i] <- read_html(movies$url_movie[i]) %>%
+    html_nodes("#titleYear a") %>%
+    html_text()
+  }
+```
+```{r}
+write.csv(movies,"Data/movies.csv", row.names = FALSE)
+rm(list = ls())
+```
+
+## Getting Synopsis
+CSS: #plot-synopsis-content .ipl-zebra-list__item
+```{r}
+movies <- read.csv("Data/movies.csv")
+movies$synopsis <- NA
+for ( i in 1:length(movies$url_synopsis)){
+  cat(paste0("Loop nr.", i, ", "))
+  movies$synopsis[i] <- read_html(movies$url_synopsis[i]) %>%
+    html_nodes("#plot-synopsis-content .ipl-zebra-list__item") %>%
+    html_text()
+}
+movies$synopsis <- str_squish(movies$synopsis)
+
+movies$synopsis <- movies$synopsis %>% 
+  gsub(pattern = "It looks like we don't have a Synopsis for this title yet. Be the first to contribute! Just click the \"Edit page\" button at the bottom of the page or learn more in the Synopsis submission guide."
+       , replacement = "empty")
+```
+
+```{r}
+write.csv(movies,"Data/synopsis.csv", row.names = FALSE)
+rm(list = ls())
+```
+
+## Plot
+```{r}
+movies <- read.csv("Data/synopsis.csv")
+movies$Available <- NA
+
+for (i in 1:length(movies$Available)){
+  if (movies$synopsis[i] == "empty"){
+    movies$Available[i] <- "No"
+  } else {
+    movies$Available[i] <- "Yes"
+  }
+}
+
+plot <- as.data.frame(table(
+  paste0(movies$year, ":", movies$Available)
+  ))
+plot$year <- plot$Var1 %>%
+  gsub(pattern = ":(.*)"
+       , replacement =  "") %>%
+  as.numeric()
+plot$Available <- plot$Var1 %>%
+  gsub(pattern = "(.*):"
+       , replacement =  "")
+
+plot <- ggplot(plot, aes(fill=Available, y=Freq, x=year)) + 
+    geom_bar(position="stack", stat="identity") +
+    ggtitle(paste0("Total Nr of synopsis available: ", unname(table(movies$Available)[2]))) +
+    xlab("") +
+    theme_bw(base_size = 18) + theme(plot.title = element_text(hjust = 0.5)) +
+    scale_x_continuous(breaks = seq(min(movies$year) + 1, max(movies$year) + 1, 5)) +
+    scale_y_continuous("Nr of synopsis",1:12)
+plot
+```
+
+### Saving Plot
+```{r}
+  jpeg(filename = "www/Availability of synopsis.jpeg", width = 1280, height = 720)
+  plot
+  dev.off()
+```
+
+```{r}
+rm(list = ls())
+```
+
+# Prepping Data for Analysis
+
+```{r}
+movies <- read.csv("Data/synopsis.csv") %>% as.data.table()
+```
+## Tokenizing
+```{r}
+##' _Transforming to lower characters_
+movies[, synopsis := str_to_lower(synopsis)]
+##' _Removing all nonalpha characters, but keeping apostrophe’s_
+movies[, synopsis := str_replace_all(synopsis, "[^[:alpha:]']", " ")]
+##' _Unnest dataframe into a tidy data.table consisting of one word per row_
+tidy_movies <- unnest_tokens(movies, word, synopsis, token = "words")
+##' _Remove stop words_
+tidy_movies <- tidy_movies %>% anti_join(stop_words)
+write.csv(tidy_movies,"Data/tidy_movies.csv")
+```
+
+## Stemming
+```{r}
+tidy_movies$word <- tokenize_word_stems(x = tidy_movies$word) %>% unlist()
+write.csv(tidy_movies, file="Data/stemmed words.csv")
+```
+
+## Counting Words
+```{r}
+tidy_movies$Key <- paste0(tidy_movies$year, ":", tidy_movies$title)
+tidy_movies <- as_tibble(tidy_movies)
+words_count <- tidy_movies %>%
+  group_by(Key) %>% 
+  count(word, sort=TRUE) %>% 
+  arrange(Key,desc(n))
+```
+
+## Manual Removal of words
+### Removing very sparse and very frequent terms
+```{r}
+#' Creating Data Term matrix
+words_count <- as_tibble(words_count)
+words_count_dtm <- words_count %>% 
+  cast_dtm(Key,word,n)
+#' *Removing very sparse terms*
+script_dtm_updated <- removeSparseTerms(words_count_dtm, 0.95) #if the words are only in 5% of movies they are deleted
+sparse_terms<- tidy(words_count_dtm) %>% anti_join(tidy(script_dtm_updated),  by="term")#
+#turning the document term matrix into a matrix
+DF_removed_sparse_terms <- tidy(script_dtm_updated)
+
+
+#' *Removing very frequent terms*
+script_dtm_2 <- removeSparseTerms(words_count_dtm, 0.05)
+DF_common_terms <- tidy(script_dtm_2)
+DF_common_terms$term <- as.character(DF_common_terms$term)
+#Making the AntiJoin
+tidy_movies <- DF_removed_sparse_terms %>% anti_join(DF_common_terms,  by="term") #if the movies are in 95% of the movies they are deleted
+```
+
+### Removing words that are two or less characters (they don't give us anything)
+```{r}
+word_length <- str_length(tidy_movies$term)
+word_length_2 <- tidy_movies[word_length==2,]
+tidy_movies <- tidy_movies[!word_length==2, ]
+tidy_movies <- data.frame(Key = tidy_movies$document
+                          ,word = tidy_movies$term
+                          ,n = tidy_movies$count)
+
+write.csv(tidy_movies,file = "Data/word count synopsis.csv",row.names = FALSE)
+rm(list = ls())
+```
+
+# Topic modelling
+```{r}
+#' *Data prep*
+synopsis_words <- read.csv("Data/word count synopsis.csv")
+
+top_words <- synopsis_words%>%
+  group_by(word) %>% 
+  summarise(sum=sum(n))
+
+words_to_remove <- top_words[top_words$sum > 2000, ] %>% 
+  select(1)
+
+synopsis_words <- synopsis_words %>% anti_join(words_to_remove,  by="word") #if the word appear more often than 2000 times they are deleted
+
+#' *Creating Data Term Matrix*
+synopsis_words_dtm <- synopsis_words %>% 
+  cast_dtm(Key,word,n)
+
+#' *Doing LDAP*
+library(doParallel)
+CoreCount  <- makePSOCKcluster(detectCores()-1)
+registerDoParallel(CoreCount)
+
+  topics <- 50
+  alpha <- 0.1
+  delta <- 0.1
+  synopsis_lda <- LDA(synopsis_words_dtm
+                     ,k = topics #No. of topics
+                     ,control = list(seed = 56, alpha = alpha, delta = delta)
+                     ,method = "Gibbs")
+  
+  saveRDS(synopsis_lda,file = paste0("Data/synopsis_lda, T = ",topics,", A = ",alpha,", D = ",delta,'.rds'))
+
+stopCluster(CoreCount)
+registerDoSEQ()
+
+lda_topics <- tidy(synopsis_lda, matrix = "beta")
+
+write.csv(lda_topics, "Data/lda_topics.csv")
+
+options(scipen = 999)
+synopsis_lda_tidy <- tidy(synopsis_lda,matrix = "gamma")
+synopsis_lda_tidy <- synopsis_lda_tidy %>% group_by(document)
+synopsis_lda_tidy <- arrange(synopsis_lda_tidy,.by_group = TRUE)
+synopsis_lda_tidy$gamma <- round(synopsis_lda_tidy$gamma,digits = 3)
+
+write.csv(synopsis_lda_tidy,paste0("Data/synopsis_LDA_tidy, T = ",topics,", A = ",alpha,", D = ",delta,'.csv'), row.names = FALSE)
+```
+
+# Sentiment Analysis
+## Bing
+```{r}
+#' *Load Data*
+synopsis_words <- read.csv("Data/tidy_movies.csv")
+synopsis_words$Key <- paste0(synopsis_words$year, synopsis_words$title)
+
+#' *Bing*
+bing_pr_year <- synopsis_words %>% 
+  inner_join(get_sentiments("bing")) %>% 
+  mutate(value = ifelse(sentiment == 'negative',yes = 0,no = 1)) %>% 
+  group_by(year) %>% 
+  summarise(sentiment = mean(value)) %>% 
+  mutate(method = "BING")
+
+### Plotting the sentiments pr year ###
+
+#Defining X and Y
+y <- bing_pr_year$sentiment
+x <- bing_pr_year$year
+  
+#Making the plot
+plot(x,y
+     ,ylab = "Sentiment Score Pr. Year"
+     ,xlab = "Year"
+     ,main = "Sentiment Score per Year"
+     ,pch = 20
+     ,sub = "Bing")
+
+#Adding a smoothing line
+smooth <- loess(y~x)
+xx <- seq(min(x), max(x), (max(x)-min(x))/1000)
+f <- predict(smooth, xx, se = TRUE)
+lines(x = xx,y = f$fit,col = "blue")
+
+#Adding confidence intervals
+ci <- f$se * qt(0.975, f$df)
+cih <- f$fit + ci
+cil <- f$fit - ci
+xx <- c(xx, rev(xx))
+yy <- c(cil, rev(cih))
+polygon(xx, yy, col=rgb(0.1,0.1,0.1,0.25), border = NA)
+
+legend("topright","Loess Fit",lty = 1,col = "blue",cex = 0.6,bg = "lightgrey")
+
+grid()
+```
+
+## NRC
+```{r}
+#' *Grouping per years*
+synopsis_words <- read.csv("Data/tidy_movies.csv")
+synopsis_words$Key <- paste0(synopsis_words$year, synopsis_words$title)
+
+tf <- 5
+decades <- c(seq(from=1925, to= 2020, by = tf))
+synopsis_words$decade <- decades[findInterval(synopsis_words$year, decades)]
+
+#' *NRC Analysis*
+sent_orig = unique(get_sentiments("nrc")$sentiment)
+sent <- sent_orig[c(1:2,4:6, 8:10)]
+countsent = length(sent)
+nrc <- synopsis_words %>% 
+  inner_join(get_sentiments("nrc")) %>% 
+  group_by(decade) %>% 
+  filter(sentiment %in% sent) %>% 
+  count(sentiment)
+sum <- nrc %>% group_by(decade) %>% summarise(sum = sum(n))
+write.csv(sum, "Data/sum_nrc.csv")
+write.csv(nrc,"Data/nrc.csv")
+#' *Radarchart*
+##' @1
+
+decades <- setdiff(c(seq(from=min(unique(nrc$decade)), to= max(unique(nrc$decade)), by = tf)), 1933)
+
+setdiff(1:85,seq(1,85,5))
+
+for (i in decades) {
+Y <- i
+  n <- data.frame(matrix(c(round(
+    nrc$n[nrc$decade == Y]/sum$sum[sum$decade == Y]*100
+    ,1)), ncol = countsent))
+  min <- data.frame(t(
+      rep(min(round(
+        nrc$n[nrc$decade == Y]/sum$sum[sum$decade == Y]*100
+        ,1)),countsent)
+    ))
+  max <- data.frame(t(
+      rep(max(round(
+        nrc$n[nrc$decade == Y]/sum$sum[sum$decade == Y]*100
+        ,1)),countsent)
+    ))
+  radar <- rbind(max, min, n)
+  colnames(radar) <- c(nrc$sentiment[nrc$decade == Y])
+  rownames(radar) <- c("max", "min", "decade")
+
+  radarchart(radar
+             , pcol = "deeppink3"
+             , pfcol = scales::alpha("pink", 0.5), plwd = 2, plty = 1
+             , cglcol = "grey", cglty = 1, cglwd = 0.8
+             , title = paste0("Timeframe ", Y, " - ", Y+tf)
+             , caxislabels=seq(min[1,1],max[1,1],((max[1,1]-min[1,1])/4))
+             , axislabcol="grey"
+             , axistype=4
+  )
+}
+
+##' @2
+
+decades <- setdiff(c(seq(from=min(unique(nrc$decade)), to= max(unique(nrc$decade)), by = tf)), 1933)
+
+setdiff(1:85,seq(1,85,5))
+
+for (i in decades) {
+Y <- i
+  n <- data.frame(matrix(c(round(
+    nrc$n[nrc$decade == Y]/sum$sum[sum$decade == Y]*100
+    ,1)), ncol = countsent))
+  min <- data.frame(t(rep(4,8)))
+  max <- data.frame(t(rep(22,8)))
+  radar <- rbind(max, min, n)
+  colnames(radar) <- c(nrc$sentiment[nrc$decade == Y])
+  rownames(radar) <- c("max", "min", "decade")
+
+  radarchart(radar
+             , pcol = "deeppink3"
+             , pfcol = scales::alpha("pink", 0.5), plwd = 2, plty = 1
+             , cglcol = "grey", cglty = 1, cglwd = 0.8
+             , title = paste0("Timeframe ", Y, " - ", Y+tf)
+                                , caxislabels=seq(0,max[1,1],(max[1,1]/4))
+                   , axislabcol="grey"
+                   , axistype=4
+  )
+}
+```
+
