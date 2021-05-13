@@ -13,6 +13,7 @@ library(dplyr)
 library(stringi)
 library(topicmodels)
 library(slickR)
+library(rlist)
 ################################################################################
 #' @UI
 ui <- navbarPage(
@@ -133,56 +134,97 @@ ui <- navbarPage(
          br(),
          mainPanel(width = 10
             , fluidRow(
+                splitLayout(cellWidths = c("50%", "50%"), h5("Synopsis"),  h5("Scripts")),
+                HTML("<h4>AFINN</h4>"),
+                splitLayout(cellWidths = c("50%", "50%")
+                            , tags$img(src='AFINN over the years.jpeg', height="100%", width="100%")
+                            , tags$img(src='AFINN over the years Scripts.jpeg', height="100%", width="100%")
+                            ),
+                HTML("<h4>NRC</h4>"),
                 sliderInput("Decade", "Timeframe:"
-                            , min = 1935, max = 2015
-                            , value = 1925, step = 5
-                            , animate = animationOptions(interval = 500, loop = TRUE)
-                            , width = "40%"),
-                h5("Synopsis"),
-                splitLayout(cellWidths = c("40%", "60%")
+                        , min = 1935, max = 2015
+                        , value = 1935, step = 5
+                        , animate = animationOptions(interval = 500, loop = TRUE)
+                        , width = "40%"),
+                splitLayout(cellWidths = c("50%", "50%")
                             , plotOutput("radarplot")
-                            , tags$img(src='AFINN over the years.jpeg', height="100%", width="100%")),
-                h5("Script"),
-                splitLayout(cellWidths = c("40%", "60%")
                             , plotOutput("radarplot2")
-                            , tags$img(src='AFINN over the years Scripts.jpeg', height="100%", width="100%")),
-                sliderInput("Decade", "Timeframe:"
-                            , min = 1935, max = 2015
-                            , value = 1925, step = 5
-                            , animate = animationOptions(interval = 500, loop = TRUE)
-                            , width = "40%")
                 )
-            )
+                )
          )
-#' *Tsne*
-    , tabPanel("4. Clusters based on TSNE",
-               h3("Clusters based on T-distributed Stochastic Neighbor Embedding"),
-               p("Below you can see the synopsis and the scripts put on a 2D graph, created with a dimensional reduction based on LDA using t-SNE."),
+    )
+#' *Heatmap*
+    , tabPanel("3. Topic Modeling",
+               h3("Heatmap based on LDA"),
                br(),
+               sliderInput("Topic","Pick the topic"
+                           , min = 1, max = 50, value = 1, step = 1),
                mainPanel(
-                   width = 11,
-                   splitLayout(cellWidths = c("50%", "50%"),
-                               h5("Clusters from Synopsis"),
-                               h5("Clusters from Scripts")
-                               ),
-                   splitLayout(cellWidths = c("50%", "50%"),
-                               plotlyOutput("tsne_syn", height = "500px"),
-                               plotlyOutput("tsne_script", height = "500px"))
-                   )
+                   fluidRow(
+                       splitLayout(
+                           cellWidths = c("35%","60%", "60%")
+                           , fluidRow(
+                               htmlOutput("mov"))
+                           , fluidRow(
+                               h5("Synopsis")
+                               , tags$img(src='Heatmap Synopsis1.jpeg', height="100%", width="100%"))
+                           , fluidRow(
+                               h5("Scripts")
+                               , tags$img(src='Heatmap Scripts1.jpeg', height="100%", width="100%"))
+                           )
+                       ),
+                   br(),
+                   br(),
+               p("When inspecting the 50 topics and what documents are having their highest gamma value in the topic,", br(),
+                 "the topics tends to have one of these 3 specific characters:"),
+               p("1.  A topic is descriptive containing 3 or more movies, representative words make sense and are aligned", br(),
+                    "with most of the movies that are grouped in one topic.", br(),
+                 "2.  A topic that has 1 or 2 movies. This kind of topic is extremely specific and describes only 1 or 2 movies.", br(),
+                    "An example of this is topic 1 containing a movie Parasite from 2019. Parasite became the first non-English film", br(),
+                    "to win the Academy Award for Best Picture therefore it makes sense this movie belongs to a separate category.", br(),
+                 "3.  A topic containing movie combinations that are strange. Meaning it seems these movies do not have much in common", br(),
+                    "but are categorized in one group anyway, e.g., topic 21 which combines The Wizard of Oz and Taxi Driver,", br(), 
+                    "while it may seem random, the explanation lies in the words that the script contains.")
                )
+    )
+
 #' *Intertopic distance map*
-    , tabPanel("5. Intertopic Distance Map",
-         h3("Intertopic Distance Map"),
-         
+    , tabPanel("4. Intertopic Distance Map",
+         h3("Intertopic Distance Map for Visualization of Topics"),
          p("From the left hand side of the plot you can see the inter relationships between the topics."),
          p("When you press a topic, you can see all the top words for this specific topic on the right hand side.", br(),
            "Each word is depict with a red bar, which is the frequency of this word in this specific topic compared to the whole corpus, which is shown as the blue bar."),
          
          mainPanel(
-             setBackgroundColor(color = "white"),
-             visOutput("DistMap"),
-             width = 11
+             fluidRow(visOutput("DistMap")
+                 ),
+             br(),
+             sliderInput("Topic3","Pick the topic"
+                         , min = 1, max = 50, value = 1, step = 1),
+             htmlOutput("mov3")
+             )
          )
+#' *Tsne*
+, tabPanel("5. Movie Clusters based on TSNE",
+           h3("Movie Clusters based on T-distributed Stochastic Neighbor Embedding"),
+           p("Below you can see the synopsis and the scripts put on a 2D graph, created with a dimensional reduction based on LDA using t-SNE."),
+           br(),
+           mainPanel(
+               width = 11,
+               splitLayout(cellWidths = c("50%", "50%"),
+                           h5("Clusters from Synopsis"),
+                           h5("Clusters from Scripts")
+               ),
+               splitLayout(cellWidths = c("50%", "50%"),
+                           plotlyOutput("tsne_syn", height = "500px"),
+                           plotlyOutput("tsne_script", height = "500px"))
+               # , p("When fitting the documents into topics based on the highest gamma value within that topic, it means that some information is lost.", br(),
+               #   "For instance, if the highest gamma value is 0.40, the document will be clustered to that specific topic, even though the topic only", br(),
+               #   "consists of 40% of that topic, hence we are loosing some information. t-SNE, a non linear technique used for dimensionality reduction,", br(),
+               #   "is very well suited for visualizations of this types of datasets. With t-SNE, we can reduce this dimensionality, and get a 2D plot, ", br(),
+               #   "where we can see some more relevant clusters of movies, that are based on all of the dimensions. This technique also comes with a cost", br(),
+               #   "since the dimensionality reduction means loosing some information, but in this case these benefits are estimated to clearly outweigh the costs.")
+           )
 )
 #' *Conclusions*
     , tabPanel("Conclusions",
@@ -292,6 +334,28 @@ server <- function(input, output) {
         radarplot2()
     })
     
+#' *Topics*
+    script_lda_tidy <- read.csv("Data/synopsis_LDA_tidy, T = 50, A = 0.1, D = 0.1.csv")
+    topics <- 50
+    lower <- 1
+    upper <- topics
+    max_topic <- NA
+    for (i in 1:(nrow(script_lda_tidy)/topics)) {
+        max_topic[i] <- which.max(script_lda_tidy$gamma[lower:upper])
+        lower <- lower + topics
+        upper <- upper + topics
+    }
+    
+    mov <- list()
+    for (i in 1:topics){
+        mov[[i]] <- script_lda_tidy$document[which(max_topic == i)*topics]
+    }
+    output$mov <- renderUI({
+        x <- paste0("<strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;",length(mov[[input$Topic]])," movies in this topic: ","</strong>","<br>","<br>","<ul>", paste(paste0("<li>",mov[[input$Topic]],"</li>"), collapse = " "), "</ul>")
+        HTML(x)
+    })
+    
+    
 #' *TSNE Synopsis*
     #Tsne is done in different doc
     tsne_out_DF <- list.load("Data/tsne_out.Rdata")
@@ -315,9 +379,9 @@ server <- function(input, output) {
         plot_ly(tsne_out_DF2, mode= "markers", type= "scatter", x=tsne_out_DF2$x, y=tsne_out_DF2$y, color= ~factor(clusters_gammas2$...52), text=df_names2$document) %>% 
             layout(hovermode="closest")
     })
-#' *DistanceMap Scripts*
-    #ldaOut <- readRDS("Data/tsne_out.rds")
-    ldaOut <- readRDS("Data/intertopic_scripts/ldaOut.rds")
+    
+#' *DistanceMap Synopsis*
+    ldaOut <- readRDS("Data/synopsis_lda, T = 50, A = 0.1, D = 0.1.rds")
     topics <- 50
     ldaOut.topics <- as.matrix(topics(ldaOut))
     k=50
@@ -337,6 +401,12 @@ server <- function(input, output) {
     output$DistMap <- renderVis(
         topicmodels2LDAvis(ldaOut)
     )
+    
+    mov3 <- mov[order(sapply(mov, length), decreasing=T)]
+    output$mov3 <- renderUI({
+        x <- mov3[[input$Topic3]]
+        HTML(x)
+    })
 }
 ################################################################################
 shinyApp(ui, server)

@@ -565,3 +565,112 @@ plot_ly(tsne_out_DF, mode= "markers", type= "scatter", x=tsne_out_DF$x, y=tsne_o
             layout(hovermode="closest")
 ```
 
+
+
+# Heat map
+
+To create a heatmap of popularity of the topics / use of topics in the given years. We must do the following:
+
+1. Load the data
+2. Aggregate pr. year pr. topic
+3. Create a new dataframe with years as the variables and the topics as the rows
+4. Use for instance `heatmap` from stats to plot the data
+
+The advantage I see from using this, is that we can account for the gamma values of the topics that was not top e.g.,
+
+## Grouping and summing gamma pr. year
+
+```{r}
+#Loading data
+df <- read.csv("Data/synopsis_LDA_tidy, T = 50, A = 0.1, D = 0.1.csv")
+df$Year <- substr(df$document,1,4)
+topics <- max(df$topic)
+
+#Aggregating pr. year pr. topic
+df %>% 
+  group_by(Year,topic) %>% #Group by year and then topic
+  summarise(GammaSum = sum(gamma)) -> GammaPrYear #Summarising with sum() over the given periods
+```
+
+
+## Creating the data for the Heatmap
+
+First we create the data for the heatmap, using the aggregations found above.
+
+```{r}
+input <- as.data.frame(matrix(nrow = topics,ncol = length(unique(GammaPrYear$Year))))
+colnames(input) <- c(unique(GammaPrYear$Year))
+rownames(input) <- c(unique(GammaPrYear$topic))
+```
+
+Now one can loop over the topics to arrange it horisontally instead.
+
+```{r}
+for (idx in 1:topics) {
+  input[idx,] <- as.vector(GammaPrYear$GammaSum[GammaPrYear$topic == idx])
+}
+```
+
+Transforming to a data matrix, apparantly it has to be this format.
+
+```{r}
+input <- data.matrix(input)
+```
+
+
+## Creating the heatmap
+
+```{r}
+heatmap(x = input
+        ,scale = "column"
+        ,Rowv = NA #Removes dendrogram on the left side
+        ,Colv = NA #Removes dendrogram on the top
+        ,main = "Heat map of popularity of topics"
+        ,col = RColorBrewer::brewer.pal(n = 9,name = "Greens")
+        )
+
+legend(legend = c("Low","","","","","","","","High")
+        ,col = RColorBrewer::brewer.pal(n = 9,name = "Greens")
+        ,x = "right"
+        ,lty = 1
+        ,lwd = 10
+        ,bty = "n"
+        ,text.col = "black"
+        )
+
+mtext(text = paste0("alpha ", as.character(alpha), " - ", "delta ", as.character(delta))
+      ,side = 2
+      )
+```
+
+
+```{r}
+    script_lda_tidy <- read.csv("Data/synopsis_LDA_tidy, T = 50, A = 0.1, D = 0.1.csv")
+    topics <- 50
+    lower <- 1
+    upper <- topics
+    max_topic <- NA
+    for (i in 1:(nrow(script_lda_tidy)/topics)) {
+        max_topic[i] <- which.max(script_lda_tidy$gamma[lower:upper])
+        lower <- lower + topics
+        upper <- upper + topics
+    }
+    
+    mov <- list()
+    for (i in 1:topics){
+        mov[[i]] <- script_lda_tidy$document[which(max_topic == i)*topics]
+    }
+    
+    nr <- c()
+    for (i in 1:50){
+      nr[i] <- length(mov[[i]])
+    }
+    
+    mov3 <- mov[order(sapply(mov, length), decreasing=T)]
+    
+    mov2 <-list()
+    for (i in 1:50){
+      mov2[[i]] <- c(nr[i], mov[[i]])
+    }
+```
+
