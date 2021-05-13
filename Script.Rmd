@@ -33,6 +33,7 @@ library(tidyr)
 library(tm)
 library(topicmodels) #for LDA
 library(fmsb) #for Radarchart
+library(rlist) #for saving list
 ```
 
 # Scraping
@@ -325,7 +326,6 @@ registerDoParallel(CoreCount)
                      ,control = list(seed = 56, alpha = alpha, delta = delta)
                      ,method = "Gibbs")
   
-  saveRDS(synopsis_lda,file = paste0("Data/synopsis_lda, T = ",topics,", A = ",alpha,", D = ",delta,'.rds'))
 
 stopCluster(CoreCount)
 registerDoSEQ()
@@ -386,10 +386,58 @@ xx <- c(xx, rev(xx))
 yy <- c(cil, rev(cih))
 polygon(xx, yy, col=rgb(0.1,0.1,0.1,0.25), border = NA)
 
+legend("topright","Loess Fit",lty = 1,col = "blue",cex = 0.,bg = "lightgrey")
+
+grid()
+```
+
+## AFINN
+```{r}
+#' *Load Data*
+synopsis_words <- read.csv("Data/tidy_movies.csv")
+synopsis_words$Key <- paste0(synopsis_words$year, synopsis_words$title)
+
+#' *AFINN*
+bing_pr_year <- synopsis_words %>% 
+  inner_join(get_sentiments("afinn")) %>% 
+  #mutate(value = ifelse(sentiment == 'negative',yes = 0,no = 1)) %>% 
+  group_by(year) %>% 
+  summarise(sentiment = mean(value)) %>% 
+  mutate(method = "BING")
+
+### Plotting the sentiments pr year ###
+
+#Defining X and Y
+y <- bing_pr_year$sentiment
+x <- bing_pr_year$year
+  
+#Making the plot
+plot(x,y
+     ,ylab = "Sentiment Score Pr. Year"
+     ,xlab = "Year"
+     ,main = "Sentiment Score per Year"
+     ,pch = 20
+     ,sub = "AFINN")
+
+#Adding a smoothing line
+smooth <- loess(y~x)
+xx <- seq(min(x), max(x), (max(x)-min(x))/1000)
+f <- predict(smooth, xx, se = TRUE)
+lines(x = xx,y = f$fit,col = "blue")
+
+#Adding confidence intervals
+ci <- f$se * qt(0.975, f$df)
+cih <- f$fit + ci
+cil <- f$fit - ci
+xx <- c(xx, rev(xx))
+yy <- c(cil, rev(cih))
+polygon(xx, yy, col=rgb(0.1,0.1,0.1,0.25), border = NA)
+
 legend("topright","Loess Fit",lty = 1,col = "blue",cex = 0.6,bg = "lightgrey")
 
 grid()
 ```
+
 
 ## NRC
 ```{r}
@@ -477,5 +525,43 @@ Y <- i
                    , axistype=4
   )
 }
+```
+
+# TSNE
+```{r}
+##' *TSNE*
+library(Rtsne)
+library(plotly)
+library(tidytext)
+scripts_lda <- readRDS("Data/synopsis_lda, T = 50, A = 0.1, D = 0.1.rds")
+script_lda_tidy <- tidy(scripts_lda,matrix = "gamma")
+script_lda_tidy <- script_lda_tidy %>% group_by(document)
+script_lda_tidy <- arrange(script_lda_tidy,.by_group = TRUE)
+script_lda_tidy$gamma <- round(script_lda_tidy$gamma,digits = 3)
+
+gamma_dist <- script_lda_tidy %>%
+  arrange(topic)
+
+wide_DF <- gamma_dist %>% spread(topic, gamma)
+
+#getting names
+df_names <- wide_DF[, 1]
+write.csv(df_names, "Data/df_names.csv")
+
+#data without names
+df_data <- wide_DF[2:50]
+
+set.seed(123)
+km.res <- kmeans(df_data, 22, nstart = 100) #15 clusters
+km.res$cluster
+clusters_gammas <- cbind(wide_DF, km.res$cluster)
+write.csv(clusters_gammas, "Data/clusters_gamma.csv")
+
+tsne_out <- Rtsne(df_data, perplexity = 20, theta=0.0, is_distance = FALSE,pca=TRUE,pca_scale=TRUE,pca_center=TRUE, verbose=TRUE,max_iter=3000,eta=200,dims=2,check_duplicates = FALSE)
+saveRDS(tsne_out,file = "Data/tsne_out.rds")
+tsne_out_DF <- data.frame(x=tsne_out$Y[,1],y=tsne_out$Y[,2])
+list.save(tsne_out_DF, "Data/tsne_out.Rdata")
+plot_ly(tsne_out_DF, mode= "markers", type= "scatter", x=tsne_out_DF$x, y=tsne_out_DF$y, color= ~factor(clusters_gammas$...52), text=df_names$document) %>% 
+            layout(hovermode="closest")
 ```
 

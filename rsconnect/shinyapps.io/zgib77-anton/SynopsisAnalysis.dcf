@@ -1,0 +1,13 @@
+name: SynopsisAnalysis
+title: SynopsisAnalysis
+username:
+account: zgib77-anton
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 4125003
+bundleId: 4593404
+url: https://antonehret.shinyapps.io/SynopsisAnalysis/
+when: 1620897673.10604
+lastSyncTime: 1620897673.10606
+asMultiple: FALSE
+asStatic: FALSE

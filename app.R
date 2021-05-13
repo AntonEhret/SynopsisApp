@@ -32,7 +32,68 @@ ui <- navbarPage(
              "However, for my individual video, I want to explore something else. The data that I will focus on now,", br(),
              "is", tags$b("viewer generated descriptions of the movies"), ". The goal is to see, whether there are differences in", br(),
              "the way that a movie is written (script) and the way a movie is descripbed by an actual viewer of the movie."),
-             
+             h4("Main Differences between Script and Synopsis"),
+                  HTML("<style>
+                           table {
+                               font-family: arial, sans-serif;
+                               border-collapse: collapse;
+                               width: 50%;
+                           }
+                       
+                       td, th {
+                           border: 1px solid #dddddd;
+                           text-align: left;
+                           padding: 6px;
+                       }
+                       
+                       tr:nth-child(even) {
+                           background-color: #dddddd;
+                       }
+                       
+                       h5 {
+                           text-align: center;
+                           font-size: 20px;
+                       }
+                       
+                       </style>
+                       <table>
+                      <tr>
+                      	<th></th>
+                        <th>Script</th>
+                        <th>Synopsis</th>
+                      </tr>
+                     <tr>
+                        <td>Source</td>
+                        <td>IMSDB, scriptsslug, scripts, others</td>
+                        <td>IMDB</td>
+                      </tr>
+                      <tr>
+                        <td>Amount obtained</td>
+                        <td>516</td>
+                        <td>369</td>
+                      </tr>
+                      <tr>
+                        <td>Nr of Words</td>
+                        <td>30.000 - 50.000</td>
+                        <td>300 - 800</td>
+                      </tr>
+                      <tr>
+                        <td>Author</td>
+                        <td>screenplay writer</td>
+                        <td>IMDB user</td>
+                      </tr>
+                      <tr>
+                        <td>Content</td>
+                        <td>spoken words of the movie</td>
+                        <td>summary of the movie</td>
+                      </tr>
+                      <td>Expected differences</td>
+                      <td>Harder to see patterns due to<br>
+                      	length and missing music and pictures</td>
+                      <td>Easier to see patterns due to <br>
+                      	condensed format and judgement of viewer</td>
+                    </table>"),
+             br(),
              p(strong("Feeel free to explore this App :) Have fun!")),
              
              p("Cheers,",em("Anton")),
@@ -66,33 +127,122 @@ ui <- navbarPage(
     )
 #' *Sentiments*
     , tabPanel("2. Sentiment Analysis",
-         h3("Sentiment Analysis with NRC and Bing"),
-         
-         p("When plotting the results of the analysis of the synopsis with the bing and the nrc", br(),
-           "(ex. positive and negative) lexicon we get similar results to the analysis done on the scripts."),
-         p("We see that the bing score is more or less the same over the years and that the radarchart", br(),
-           "containing the results from the analysis based on nrc in bins of 5 years."),
+         h3("Sentiment Analysis with NRC and AFINN"),
          br(),
-         mainPanel(width = 11
+         p("Below you can compare the scores for AFINN and NRC for the synopsis and scripts"),
+         br(),
+         mainPanel(width = 10
             , fluidRow(
                 sliderInput("Decade", "Timeframe:"
                             , min = 1935, max = 2015
                             , value = 1925, step = 5
                             , animate = animationOptions(interval = 500, loop = TRUE)
                             , width = "40%"),
-                splitLayout(cellWidths = c("40%", "60%")
-                            , h4("NRC dictionary")
-                            , h4("Bing dictionary")),
+                h5("Synopsis"),
                 splitLayout(cellWidths = c("40%", "60%")
                             , plotOutput("radarplot")
-                            , tags$img(src='BING over the years.jpeg', height="100%", width="100%")))
+                            , tags$img(src='AFINN over the years.jpeg', height="100%", width="100%")),
+                h5("Script"),
+                splitLayout(cellWidths = c("40%", "60%")
+                            , plotOutput("radarplot2")
+                            , tags$img(src='AFINN over the years Scripts.jpeg', height="100%", width="100%")),
+                sliderInput("Decade", "Timeframe:"
+                            , min = 1935, max = 2015
+                            , value = 1925, step = 5
+                            , animate = animationOptions(interval = 500, loop = TRUE)
+                            , width = "40%")
+                )
+            )
          )
-    )
+#' *Tsne*
+    , tabPanel("4. Clusters based on TSNE",
+               h3("Clusters based on T-distributed Stochastic Neighbor Embedding"),
+               p("Below you can see the synopsis and the scripts put on a 2D graph, created with a dimensional reduction based on LDA using t-SNE."),
+               br(),
+               mainPanel(
+                   width = 11,
+                   splitLayout(cellWidths = c("50%", "50%"),
+                               h5("Clusters from Synopsis"),
+                               h5("Clusters from Scripts")
+                               ),
+                   splitLayout(cellWidths = c("50%", "50%"),
+                               plotlyOutput("tsne_syn", height = "500px"),
+                               plotlyOutput("tsne_script", height = "500px"))
+                   )
+               )
+#' *Intertopic distance map*
+    , tabPanel("5. Intertopic Distance Map",
+         h3("Intertopic Distance Map"),
+         
+         p("From the left hand side of the plot you can see the inter relationships between the topics."),
+         p("When you press a topic, you can see all the top words for this specific topic on the right hand side.", br(),
+           "Each word is depict with a red bar, which is the frequency of this word in this specific topic compared to the whole corpus, which is shown as the blue bar."),
+         
+         mainPanel(
+             setBackgroundColor(color = "white"),
+             visOutput("DistMap"),
+             width = 11
+         )
+)
+#' *Conclusions*
+    , tabPanel("Conclusions",
+               h3("Conclusions"),
+               br(),
+               p("So what are the Conclusions we can make?"),
+               mainPanel(
+                   h4("Analysis of Sentiments"),
+                   HTML("
+                     <style>
+                         .box {
+                                width: 80%;
+                                align: center;
+                                border: 4px solid #008B8B;
+                                padding: 20px;
+                                margin: auto;
+                           }
+                       </style>
+                     <div class='box'>
+                     <strong>We can observe:<strong><br>
+                     <ul>
+                      <li>There are no significant patterns in nrc or afinn for scripts or synopsis</li>
+                      <li>NRC: In both cases trust and fear are the strongest emotions, the over all patterns are similar.</li>
+                      <li>AFINN: The synopsis seems to be written in an overall more negative tone</li>
+                    </ul>
+                    <strong>One can conclude:<strong><br>
+                    <ul>
+                      <li>The emotions portrayed in the scripts and in the synopsis did not change significantly over the years</li>
+                      <li>The academy award members are looking for a specific feeling that the movies portray when nominating them</li>
+                    </ul>
+                     </div>"),
+                   h4("Clusters based on TSNE"),
+                   HTML("
+                     <style>
+                         .box {
+                                width: 80%;
+                                align: center;
+                                border: 4px solid #008B8B;
+                                padding: 20px;
+                                margin: auto;
+                           }
+                       </style>
+                     <div class='box'>
+                     <strong>We can observe:<strong><br>
+                     <ul>
+                      <li>In both cases some clusters are seem to be more correct than others</li>
+                      <li>The clusters based on the synopsis make less sense than based on the scripts</li>
+                    </ul>
+                    <strong>One can conclude:<strong><br>
+                    <ul>
+                      <li>If one was to make use of the clusters for e.g. recommendations of related movies the scripts should be rather analyzed than the synopsis</li>
+                    </ul>
+                     </div>")
+                   )
+               )
 )
 ################################################################################
 #' @Server
 server <- function(input, output) {
-#' *NRC RADARCHART*
+#' *NRC RADARCHART Synopsis*
     sum <- read.csv("Data/sum_nrc.csv")
     nrc <- read.csv("Data/nrc.csv")
     radarplot <- reactive({
@@ -117,6 +267,76 @@ server <- function(input, output) {
         radarplot()
     })
     
+#' *NRC RADARCHART Script*
+    nrc2 <- read.csv("Data/nrcScripts.csv")
+    sum2 <- nrc2 %>% group_by(decade) %>% summarise(sum2 = sum(n)) 
+    radarplot2 <- reactive({
+        Y = input$Decade
+        n2 <- data.frame(matrix(c(round(nrc2$n[nrc2$decade == Y]/sum2$sum2[sum2$decade == Y]*100,1)), ncol = 8)) 
+        min2 <- data.frame(t(rep(0,8)))
+        max2 <- data.frame(t(rep(24,8)))
+        radar2 <- rbind(max2, min2, n2)
+        colnames(radar2) <- c(nrc2$sentiment[nrc2$decade == Y])
+        rownames(radar2) <- c("max", "min", "year")
+        radarchart(radar2
+                   , pcol = "deeppink3"
+                   , pfcol = scales::alpha("pink", 0.5), plwd = 2, plty = 1
+                   , cglcol = "grey", cglty = 1, cglwd = 0.8
+                   , title = paste0("Timeframe ", Y, " - ", Y+5)
+                   , caxislabels=seq(0,max2[1,1],(max2[1,1]/4))
+                   , axislabcol="grey"
+                   , axistype=4
+        )
+    })
+    output$radarplot2 <- renderPlot({
+        radarplot2()
+    })
+    
+#' *TSNE Synopsis*
+    #Tsne is done in different doc
+    tsne_out_DF <- list.load("Data/tsne_out.Rdata")
+    #tsne_out_DF <- data.frame(x=tsne_out$y[,1],y=tsne_out$y[,2])
+    clusters_gammas <- read.csv("Data/clusters_gamma.csv")
+    df_names <- read.csv("Data/df_names.csv")
+    
+    output$tsne_syn <- renderPlotly({
+        plot_ly(tsne_out_DF, mode= "markers", type= "scatter", x=tsne_out_DF$x, y=tsne_out_DF$y, color= ~factor(clusters_gammas$...52), text=df_names$document) %>% 
+            layout(hovermode="closest")
+    })
+#' *TSNE Script*
+    scripts_lda2 <- readRDS("Data/tsne_scripts/scripts_lda, T = 50, A = 0.1, D = 0.1.rds")
+    #Tsne is done in different doc
+    tsne_out2 <- list.load("Data/tsne_scripts/tsne_out.RData")
+    tsne_out_DF2 <- data.frame(x=tsne_out2$Y[,1],y=tsne_out2$Y[,2])
+    clusters_gammas2 <- read.csv("Data/tsne_scripts/clusters_gammas.csv")
+    df_names2 <- read.csv("Data/tsne_scripts/df_names.csv")
+    
+    output$tsne_script <- renderPlotly({
+        plot_ly(tsne_out_DF2, mode= "markers", type= "scatter", x=tsne_out_DF2$x, y=tsne_out_DF2$y, color= ~factor(clusters_gammas2$...52), text=df_names2$document) %>% 
+            layout(hovermode="closest")
+    })
+#' *DistanceMap Scripts*
+    #ldaOut <- readRDS("Data/tsne_out.rds")
+    ldaOut <- readRDS("Data/intertopic_scripts/ldaOut.rds")
+    topics <- 50
+    ldaOut.topics <- as.matrix(topics(ldaOut))
+    k=50
+    ldaOut.terms <- as.matrix(terms(ldaOut,15))
+    topicmodels2LDAvis <- function(x, ...){
+        post <- topicmodels::posterior(x)
+        if (ncol(post[["topics"]]) < 3) stop("The model must contain > 2 topics")
+        mat <- x@wordassignments
+        LDAvis::createJSON(
+            phi = post[["terms"]], 
+            theta = post[["topics"]],
+            vocab = colnames(post[["terms"]]),
+            doc.length = slam::row_sums(mat, na.rm = TRUE),
+            term.frequency = slam::col_sums(mat, na.rm = TRUE)
+        )
+    }
+    output$DistMap <- renderVis(
+        topicmodels2LDAvis(ldaOut)
+    )
 }
 ################################################################################
 shinyApp(ui, server)
