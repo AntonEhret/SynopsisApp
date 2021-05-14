@@ -33,12 +33,69 @@ ui <- navbarPage(
              "However, for my individual video, I want to explore something else. The data that I will focus on now,", br(),
              "is", tags$b("viewer generated descriptions of the movies"), ". The goal is to see, whether there are differences in", br(),
              "the way that a movie is written (script) and the way a movie is descripbed by an actual viewer of the movie."),
-             h4("Main Differences between Script and Synopsis"),
+             br(),
+             p(strong("Feeel free to explore this App :) Have fun!")),
+             
+             p("Cheers,",em("Anton")),
+             
+             
+             tags$img(src='Anton.jpeg', width="350"),
+             HTML("<br/>"),
+             HTML("<br/>"),
+             p("P.s.:", br(),
+               "I am running this App on a free server, so you might notice that the performance is not that great!", br(),
+               "If you notice that the plots do not show or take a while to show up, just give it a little bit of time ;)")
+    )
+#' *Findings from Original Paper*
+    , tabPanel("Findings from Original Paper",
+               h3("Findings from original Paper"),
+               mainPanel(
+                   HTML("
+                    <style>
+                         .box {
+                                width: 100%;
+                                align: center;
+                                border: 4px solid black;
+                                padding: 20px;
+                                margin: auto;
+                           }
+                       </style>
+                     <div class='box'>
+                    <dl>
+                      <dt><strong>Emotions</strong></dt>
+                      <dd>- None of the techniques are made for documents that long or that old</dd>
+                      <dd>- Emotions portrayed are similar over the years </dd>
+                      <dd>- Slightly negative tendencies overall </dd>
+                      <dd>- Fear is always the strongest emotion </dd>
+                      <dd>- disgust always the weakest emotion </dd>
+                      <dd>- opposite nrc feelings (e.g. joy & sadness) sem to have high correlations </dd>
+                      <dt><strong>Topic Analysis</strong></dt>
+                      <dd>- LDA has been very successful at finding reasonable topics</dd>
+                      <dd>- Not all topics make sense at first seight</dd>
+                      <dd>- Using only the macimum gamma makes some of the information lost</dd>
+                      <dd>- To take not only max gamma value into acccount dimension reduction tsne is taken into acount</dd>
+                      <dd>- With tsne really nice patterns can be seen and movies are grouped together in sensible ways</dd>
+                      <dt><strong>Types of topics:</strong></dt>
+                      <dd>- Niche for special movies like parasite</dd>
+                      <dd>- General topics for e.g. scenery description, camera angles</dd>
+                      <dd>- Trending topics, topics that actually make sense are are seen only in specific times</dd>
+                      <dt><strong>Toppic Contents</strong></dt>
+                      <dd>- war, action, western, space and fighting</dd>
+                      <dd>- old topics, old language, softer topics and royalty</dd>
+                      <dd>- modern softer topics, music, family and romance</dd>
+                      <dd>- sports</dd>
+                      <dd>- politics</dd>
+                      <dd>- education</dd>
+                      <dd>- health</dd>
+                      <dd>- trash cans</dd>
+                  </d1>
+                  </div>"),
+                  h3("Assumed Main Differences between Script and Synopsis"),
                   HTML("<style>
                            table {
                                font-family: arial, sans-serif;
                                border-collapse: collapse;
-                               width: 50%;
+                               width: 100%;
                            }
                        
                        td, th {
@@ -57,6 +114,7 @@ ui <- navbarPage(
                        }
                        
                        </style>
+                       <div class='box'>
                        <table>
                       <tr>
                       	<th></th>
@@ -89,23 +147,11 @@ ui <- navbarPage(
                         <td>summary of the movie</td>
                       </tr>
                       <td>Expected differences</td>
-                      <td>Harder to see patterns due to<br>
-                      	length and missing music and pictures</td>
-                      <td>Easier to see patterns due to <br>
-                      	condensed format and judgement of viewer</td>
-                    </table>"),
-             br(),
-             p(strong("Feeel free to explore this App :) Have fun!")),
-             
-             p("Cheers,",em("Anton")),
-             
-             
-             tags$img(src='Anton.jpeg', width="350"),
-             HTML("<br/>"),
-             HTML("<br/>"),
-             p("P.s.:", br(),
-               "I am running this App on a free server, so you might notice that the performance is not that great!", br(),
-               "If you notice that the plots do not show or take a while to show up, just give it a little bit of time ;)")
+                      <td>Harder to see patterns due to length and missing music and pictures</td>
+                      <td>Easier to see patterns due to condensed format and judgement of viewer</td>
+                    </table>
+                    </div>"),
+               )
     )
 #' *Data Preparations*
     , tabPanel("1. Data Preparations",
@@ -403,6 +449,7 @@ server <- function(input, output) {
     )
     
     mov3 <- mov[order(sapply(mov, length), decreasing=T)]
+    
     output$mov3 <- renderUI({
         x <- mov3[[input$Topic3]]
         HTML(x)
